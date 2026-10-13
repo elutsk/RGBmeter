@@ -1,5 +1,5 @@
 idf_component_register(SRCS "main.cpp"
                        INCLUDE_DIRS "."
-                       PRIV_REQUIRES drivers)
+                       PRIV_REQUIRES drivers core)
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -std=gnu++14)
