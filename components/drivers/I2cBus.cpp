@@ -4,7 +4,7 @@
 I2cBus::I2cBus(gpio_num_t sda, gpio_num_t scl)
 {
     i2c_master_bus_config_t config = {};
-    config.i2c_port = I2C_NUM_0;
+    config.i2c_port = port_;
     config.sda_io_num = sda;
     config.scl_io_num = scl;
     config.clk_source = I2C_CLK_SRC_DEFAULT;

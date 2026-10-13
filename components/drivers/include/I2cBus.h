@@ -16,6 +16,10 @@ public:
 
     i2c_master_bus_handle_t handle() const { return handle_; }
 
+    // Some third-party drivers identify the bus by port number, not by handle.
+    i2c_port_num_t port() const { return port_; }
+
 private:
+    i2c_port_num_t port_ = I2C_NUM_0;
     i2c_master_bus_handle_t handle_ = nullptr;
 };
