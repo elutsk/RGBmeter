@@ -10,8 +10,7 @@ namespace {
 constexpr int kTextScale = 2;
 constexpr int kRowPitch = 16;
 
-void drawChannel(IDisplay& display, int row, char label, uint16_t value)
-{
+void drawChannel(IDisplay& display, int row, char label, uint16_t value) {
     char line[16];
     std::snprintf(line, sizeof(line), "%c %5u", label, static_cast<unsigned>(value));
     display.drawText(0, row * kRowPitch, line, kTextScale);
@@ -19,13 +18,10 @@ void drawChannel(IDisplay& display, int row, char label, uint16_t value)
 
 }  // namespace
 
-App::App(IColorSensor& colorSensor, IDisplay& display, IButton& button)
-    : colorSensor_(colorSensor), display_(display), button_(button)
-{
-}
+App::App(IColorSensor& colorSensor, IClimateSensor& climateSensor, IDisplay& display, IButton& button)
+    : colorSensor_(colorSensor), climateSensor_(climateSensor), display_(display), button_(button) {}
 
-void App::tick()
-{
+void App::tick() {
     if (button_.wasPressed()) {
         mode_ = (mode_ == Mode::Rgb) ? Mode::Climate : Mode::Rgb;
     }
@@ -44,8 +40,7 @@ void App::tick()
     (void)display_.flush();
 }
 
-void App::renderRgb()
-{
+void App::renderRgb() {
     ColorSample sample = {};
     if (!colorSensor_.read(sample)) {
         display_.drawText(0, 0, "Read error", kTextScale);
@@ -57,9 +52,21 @@ void App::renderRgb()
     drawChannel(display_, 3, 'B', sample.b);
 }
 
-void App::renderClimate()
-{
-    // Placeholder until the BME688 driver is added.
-    display_.drawText(0, 0, "Climate", kTextScale);
-    display_.drawText(0, kRowPitch, "soon", kTextScale);
+void App::renderClimate() {
+    ClimateSample sample = {};
+    if (!climateSensor_.read(sample)) {
+        display_.drawText(0, 0, "Read error", kTextScale);
+        return;
+    }
+
+    // The font has no degree sign, so plain "C" is used.
+    char line[16];
+    std::snprintf(line, sizeof(line), "T %5.1f C", static_cast<double>(sample.tempC));
+    display_.drawText(0, 0 * kRowPitch, line, kTextScale);
+    std::snprintf(line, sizeof(line), "H %5.1f %%", static_cast<double>(sample.humidityPct));
+    display_.drawText(0, 1 * kRowPitch, line, kTextScale);
+    std::snprintf(line, sizeof(line), "hPa %5.0f", static_cast<double>(sample.pressureHpa));
+    display_.drawText(0, 2 * kRowPitch, line, kTextScale);
+    std::snprintf(line, sizeof(line), "mmHg %4.1f", static_cast<double>(sample.pressureHpa * 0.75f));
+    display_.drawText(0, 3 * kRowPitch, line, kTextScale);
 }

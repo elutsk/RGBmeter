@@ -1,4 +1,5 @@
 #include "App.h"
+#include "Bme688.h"
 #include "GpioButton.h"
 #include "I2cBus.h"
 #include "Ssd1306Display.h"
@@ -25,6 +26,7 @@ extern "C" void app_main(void)
     I2cBus bus(kSdaPin, kSclPin);
     Veml6040 veml(bus);
     Ssd1306Display oled(bus);
+    Bme688 bme(bus);
     GpioButton button(kButtonPin);
 
     if (!veml.init()) {
@@ -35,8 +37,12 @@ extern "C" void app_main(void)
         ESP_LOGE(TAG, "SSD1306 init failed");
         return;
     }
+    if (!bme.init()) {
+        ESP_LOGE(TAG, "BME688 init failed");
+        return;
+    }
 
-    App app(veml, oled, button);
+    App app(veml, bme, oled, button);
 
     while (true) {
         app.tick();

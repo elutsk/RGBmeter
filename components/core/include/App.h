@@ -5,6 +5,7 @@
 #include "IButton.h"
 #include "IColorSensor.h"
 #include "IDisplay.h"
+#include "IClimateSensor.h"
 
 // Application logic. Knows nothing about ESP-IDF or concrete hardware:
 // it works only through interfaces passed into the constructor.
@@ -12,7 +13,7 @@ class App {
 public:
     enum class Mode : uint8_t { Rgb, Climate };
 
-    App(IColorSensor& colorSensor, IDisplay& display, IButton& button);
+    App(IColorSensor& colorSensor, IClimateSensor& climateSensor, IDisplay& display, IButton& button);
 
     App(const App&) = delete;
     App& operator=(const App&) = delete;
@@ -27,6 +28,7 @@ private:
     void renderClimate();
 
     IColorSensor& colorSensor_;
+    IClimateSensor& climateSensor_;   // new
     IDisplay& display_;
     IButton& button_;
     Mode mode_ = Mode::Rgb;  // default mode after power-up
