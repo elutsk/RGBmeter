@@ -18,14 +18,11 @@ void drawChannel(IDisplay& display, int row, char label, uint16_t value) {
 
 }  // namespace
 
-App::App(IColorSensor& colorSensor, IClimateSensor& climateSensor, IDisplay& display, IButton& button)
-    : colorSensor_(colorSensor), climateSensor_(climateSensor), display_(display), button_(button) {}
+App::App(IColorSensor& colorSensor, IClimateSensor& climateSensor, IDisplay& display, IButton& modeButton, IButton& memoryButton)
+    : colorSensor_(colorSensor), climateSensor_(climateSensor), display_(display), modeButton_(modeButton), memoryButton_(memoryButton) {}
 
 void App::tick() {
-    if (button_.wasPressed()) {
-        mode_ = (mode_ == Mode::Rgb) ? Mode::Climate : Mode::Rgb;
-    }
-
+    handleButtons();
     display_.clear();
     switch (mode_) {
     case Mode::Rgb:
@@ -38,6 +35,16 @@ void App::tick() {
 
     // Nothing useful to do on failure here: the next tick will try again.
     (void)display_.flush();
+}
+
+void App::handleButtons() {
+    if (modeButton_.wasShortClicked()) mode_ = (mode_ == Mode::Rgb) ? Mode::Climate : Mode::Rgb;
+    if (modeButton_.wasLongClicked()) powerRequested_ = true;  // reserved for power saving
+
+    // Memory is added in the next step. Until then the events are read and
+    // dropped, so they do not stay latched and fire later all at once.
+    (void)memoryButton_.wasShortClicked();
+    (void)memoryButton_.wasLongClicked();
 }
 
 void App::renderRgb() {

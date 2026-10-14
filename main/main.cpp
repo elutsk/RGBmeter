@@ -14,20 +14,21 @@ namespace {
 
 constexpr gpio_num_t kSdaPin = GPIO_NUM_12;
 constexpr gpio_num_t kSclPin = GPIO_NUM_13;
-constexpr gpio_num_t kButtonPin = GPIO_NUM_11;
-constexpr int kTickPeriodMs = 200;  // longer than the 160 ms VEML6040 integration time
+constexpr gpio_num_t kModeButtonPin = GPIO_NUM_11;    // button 1
+constexpr gpio_num_t kMemoryButtonPin = GPIO_NUM_10;  // button 2
+constexpr int kTickPeriodMs = 200;                    // longer than the 160 ms VEML6040 integration time
 
 }  // namespace
 
 // Composition root: creates the concrete hardware objects,
 // wires them into App through interfaces, and runs the main loop.
-extern "C" void app_main(void)
-{
+extern "C" void app_main(void) {
     I2cBus bus(kSdaPin, kSclPin);
     Veml6040 veml(bus);
     Ssd1306Display oled(bus);
     Bme688 bme(bus);
-    GpioButton button(kButtonPin);
+    GpioButton modeButton(kModeButtonPin);
+    GpioButton memoryButton(kMemoryButtonPin);
 
     if (!veml.init()) {
         ESP_LOGE(TAG, "VEML6040 init failed");
@@ -42,7 +43,7 @@ extern "C" void app_main(void)
         return;
     }
 
-    App app(veml, bme, oled, button);
+    App app(veml, bme, oled, modeButton, memoryButton);
 
     while (true) {
         app.tick();

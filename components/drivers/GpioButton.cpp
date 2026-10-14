@@ -1,17 +1,20 @@
 #include "GpioButton.h"
 
 #include "esp_err.h"
+#include "esp_log.h"
+
+static const char* TAG = "button";
 
 namespace {
 
-constexpr uint64_t kPollPeriodUs = 10 * 1000;  // sample the pin every 10 ms
-constexpr uint8_t kStableSamples = 3;          // 3 equal samples = 30 ms stable
+constexpr uint32_t kPollPeriodMs = 10;                             // sample the pin every 10 ms
+constexpr uint8_t kStableSamples = 3;                              // 3 equal samples = 30 ms stable
+constexpr uint32_t kLongClickMs = 1000;                            // hold time for a long click
+constexpr uint16_t kLongClickPolls = kLongClickMs / kPollPeriodMs;  // = 100 polls
 
 }  // namespace
 
-GpioButton::GpioButton(gpio_num_t pin)
-    : pin_(pin)
-{
+GpioButton::GpioButton(gpio_num_t pin) : pin_(pin) {
     gpio_config_t io = {};
     io.pin_bit_mask = 1ULL << pin_;
     io.mode = GPIO_MODE_INPUT;
@@ -28,11 +31,10 @@ GpioButton::GpioButton(gpio_num_t pin)
     args.dispatch_method = ESP_TIMER_TASK;
     args.name = "button";
     ESP_ERROR_CHECK(esp_timer_create(&args, &timer_));
-    ESP_ERROR_CHECK(esp_timer_start_periodic(timer_, kPollPeriodUs));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(timer_, kPollPeriodMs * 1000));
 }
 
-GpioButton::~GpioButton()
-{
+GpioButton::~GpioButton() {
     // Stop the timer before the object dies: otherwise the callback
     // could run with a dangling 'this'.
     if (timer_ != nullptr) {
@@ -41,36 +43,49 @@ GpioButton::~GpioButton()
     }
 }
 
-bool GpioButton::wasPressed()
-{
-    // Read the flag and clear it in one indivisible step.
-    return pressed_.exchange(false);
+bool GpioButton::wasShortClicked() {
+    const bool clicked = shortClick_.exchange(false);  // read and clear in one step
+    if (clicked) ESP_LOGI(TAG, "GPIO%d short click", static_cast<int>(pin_));
+    return clicked;
 }
 
-void GpioButton::onTimer(void* arg)
-{
+bool GpioButton::wasLongClicked() {
+    const bool clicked = longClick_.exchange(false);
+    if (clicked) ESP_LOGI(TAG, "GPIO%d long click", static_cast<int>(pin_));
+    return clicked;
+}
+
+void GpioButton::onTimer(void* arg) {
     static_cast<GpioButton*>(arg)->poll();
 }
 
-void GpioButton::poll()
-{
+void GpioButton::poll() {
     const bool down = (gpio_get_level(pin_) == 0);  // active low
 
+    // 1. Debounce: any change of the raw level restarts the count.
     if (down != lastRaw_) {
-        // Level changed: restart counting (this is where bounce is filtered).
         lastRaw_ = down;
         stableCount_ = 0;
         return;
     }
+    if (stableCount_ < kStableSamples) ++stableCount_;
+    if (stableCount_ < kStableSamples) return;  // not stable long enough yet
 
-    if (stableCount_ < kStableSamples) {
-        ++stableCount_;
-    }
-
-    if (stableCount_ == kStableSamples && down != stableDown_) {
+    // 2. Debounced edge: press starts timing, release may be a short click.
+    if (down != stableDown_) {
         stableDown_ = down;
         if (down) {
-            pressed_.store(true);  // report the press edge only, not the release
+            heldPolls_ = 0;
+            longReported_ = false;
+        } else if (!longReported_) {
+            shortClick_.store(true);
         }
+        return;
+    }
+
+    // 3. Still held: report a long click once, when the hold time is reached.
+    if (stableDown_ && !longReported_ && ++heldPolls_ >= kLongClickPolls) {
+        longClick_.store(true);
+        longReported_ = true;
     }
 }
