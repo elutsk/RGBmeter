@@ -6,7 +6,11 @@ VEML6040 color sensor and are shown on the device's own small OLED display.
 Optional temperature, humidity and air pressure monitoring uses a Bosch BME68x
 sensor.
 
-Written in C++14 on top of ESP-IDF 5.5.
+<p align="center">
+  <img src="media/proto0.jpg" width="100%" alt="Display prototype">
+</p>
+
+Written in C++14 on top of ESP-IDF 5.5. VS Code was used for hacking.
 
 ## Features
 
@@ -35,7 +39,7 @@ from the source and shield it from ambient light.
 | ESP32-S3 Super Mini (4 MB flash) | USB (Serial/JTAG) | - |
 | Vishay VEML6040 RGBW color sensor | I2C | 0x10 |
 | SSD1306 OLED 128x64 (yellow/blue) | I2C | 0x3C |
-| Bosch BME68x environmental sensor (BME688) | I2C | 0x77 |
+| Bosch BME68x environmental sensor | I2C | 0x77 |
 | Push button to GND | GPIO | GPIO11 |
 
 ### Wiring
@@ -53,7 +57,7 @@ breakout modules already carry their own I2C pull-up resistors.
 
 ## Software
 
-- ESP-IDF 5.5, C++14
+- ESP-IDF 5.5, C++14, VS Code
 - [chill-sam/ssd1306](https://components.espressif.com/components/chill-sam/ssd1306)
   OLED driver, pulled in automatically by the IDF Component Manager
 
