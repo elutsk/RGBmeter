@@ -23,6 +23,7 @@ public:
 
     Mode mode() const { return mode_; }
     bool powerRequested() const { return powerRequested_; }
+    bool memoryActive() const { return hasMemory_; }
 
 private:
     void handleButtons();
@@ -33,7 +34,16 @@ private:
     IClimateSensor& climateSensor_;
     IDisplay& display_;
     IButton& modeButton_;    // button 1: short = next screen, long = power (reserved)
-    IButton& memoryButton_;  // button 2: memory on the RGB screen (next step)
+    IButton& memoryButton_;  // button 2 on the RGB screen: short = save, long = clear memory
     Mode mode_ = Mode::Rgb;  // default mode after power-up
     bool powerRequested_ = false;  // set by a long click on button 1; not used yet
+
+    // The sample shown on the RGB screen by the previous tick: this is
+    // what the user saw when pressing button 2, so this is what gets saved.
+    ColorSample lastShown_ = {};
+    bool hasLastShown_ = false;
+
+    // Saved reference (memory). While active, the RGB screen shows differences.
+    ColorSample memory_ = {};
+    bool hasMemory_ = false;
 };

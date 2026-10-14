@@ -16,6 +16,22 @@ void drawChannel(IDisplay& display, int row, char label, uint16_t value) {
     display.drawText(0, row * kRowPitch, line, kTextScale);
 }
 
+// Memory marker: one 5x7 character at scale 1 in the top right corner.
+constexpr int kMarkerX = 128 - 6;
+constexpr int kMarkerY = 0;
+
+// Shows current - saved with a sign: "+11", "-44", and plain "0" when equal.
+void drawDelta(IDisplay& display, int row, char label, uint16_t current, uint16_t saved) {
+    const int delta = static_cast<int>(current) - static_cast<int>(saved);
+    char line[16];
+    if (delta == 0) {
+        std::snprintf(line, sizeof(line), "%c %6d", label, delta);
+    } else {
+        std::snprintf(line, sizeof(line), "%c %+6d", label, delta);
+    }
+    display.drawText(0, row * kRowPitch, line, kTextScale);
+}
+
 }  // namespace
 
 App::App(IColorSensor& colorSensor, IClimateSensor& climateSensor, IDisplay& display, IButton& modeButton, IButton& memoryButton)
@@ -38,25 +54,48 @@ void App::tick() {
 }
 
 void App::handleButtons() {
-    if (modeButton_.wasShortClicked()) mode_ = (mode_ == Mode::Rgb) ? Mode::Climate : Mode::Rgb;
+    if (modeButton_.wasShortClicked()) {
+        mode_ = (mode_ == Mode::Rgb) ? Mode::Climate : Mode::Rgb;
+        hasLastShown_ = false;  // it belongs to the previous visit of the RGB screen
+    }
     if (modeButton_.wasLongClicked()) powerRequested_ = true;  // reserved for power saving
 
-    // Memory is added in the next step. Until then the events are read and
-    // dropped, so they do not stay latched and fire later all at once.
-    (void)memoryButton_.wasShortClicked();
-    (void)memoryButton_.wasLongClicked();
+    // Read both memory events on every tick, so they never stay latched,
+    // but act on them only on the RGB screen.
+    const bool save = memoryButton_.wasShortClicked();
+    const bool clear = memoryButton_.wasLongClicked();
+    if (mode_ != Mode::Rgb) return;
+
+    if (save && hasLastShown_) {
+        memory_ = lastShown_;
+        hasMemory_ = true;
+    }
+    if (clear) hasMemory_ = false;
 }
 
 void App::renderRgb() {
+    if (hasMemory_) display_.drawText(kMarkerX, kMarkerY, "M", 1);
+
     ColorSample sample = {};
     if (!colorSensor_.read(sample)) {
+        hasLastShown_ = false;
         display_.drawText(0, 0, "Read error", kTextScale);
         return;
     }
-    drawChannel(display_, 0, 'W', sample.w);
-    drawChannel(display_, 1, 'R', sample.r);
-    drawChannel(display_, 2, 'G', sample.g);
-    drawChannel(display_, 3, 'B', sample.b);
+    lastShown_ = sample;
+    hasLastShown_ = true;
+
+    if (hasMemory_) {
+        drawDelta(display_, 0, 'W', sample.w, memory_.w);
+        drawDelta(display_, 1, 'R', sample.r, memory_.r);
+        drawDelta(display_, 2, 'G', sample.g, memory_.g);
+        drawDelta(display_, 3, 'B', sample.b, memory_.b);
+    } else {
+        drawChannel(display_, 0, 'W', sample.w);
+        drawChannel(display_, 1, 'R', sample.r);
+        drawChannel(display_, 2, 'G', sample.g);
+        drawChannel(display_, 3, 'B', sample.b);
+    }
 }
 
 void App::renderClimate() {
