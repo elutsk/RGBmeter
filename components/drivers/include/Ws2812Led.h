@@ -24,6 +24,8 @@ public:
     bool setColor(uint8_t red, uint8_t green, uint8_t blue) override;
     bool off() override;
 
+    void ledTest(uint8_t level, uint32_t delay);
+
 private:
     gpio_num_t pin_;
     led_strip_t* handle_ = nullptr;  // same type as the library's led_strip_handle_t

@@ -20,6 +20,17 @@ bool Ws2812Led::init() {
     return led_strip_new_rmt_device(&stripConfig, &rmtConfig, &handle_) == ESP_OK;
 }
 
+void Ws2812Led::ledTest(uint8_t level, uint32_t delay) {
+    // LED test: red, green, blue for predefined delay in msec each, then off.
+    setColor(level, 0, 0);
+    vTaskDelay(pdMS_TO_TICKS(delay));
+    setColor(0, level, 0);
+    vTaskDelay(pdMS_TO_TICKS(delay));
+    setColor(0, 0, level);
+    vTaskDelay(pdMS_TO_TICKS(delay));
+    off();
+}
+
 bool Ws2812Led::setColor(uint8_t red, uint8_t green, uint8_t blue) {
     if (handle_ == nullptr) return false;
     if (led_strip_set_pixel(handle_, 0, red, green, blue) != ESP_OK) return false;

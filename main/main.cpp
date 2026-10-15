@@ -19,6 +19,7 @@ constexpr gpio_num_t kModeButtonPin = GPIO_NUM_11;    // button 1
 constexpr gpio_num_t kMemoryButtonPin = GPIO_NUM_10;  // button 2
 constexpr gpio_num_t kLedPin = GPIO_NUM_48;           // on-board WS2812
 constexpr int kTickPeriodMs = 200;                    // longer than the 160 ms VEML6040 integration time
+constexpr uint8_t kLedLevel = 64;                  // RGB LED brightness
 
 }  // namespace
 
@@ -26,16 +27,19 @@ constexpr int kTickPeriodMs = 200;                    // longer than the 160 ms 
 // wires them into App through interfaces, and runs the main loop.
 extern "C" void app_main(void) {
     Ws2812Led led(kLedPin);
-    if (!led.init()) ESP_LOGE(TAG, "LED init failed");
+    if (!led.init()) {
+        ESP_LOGE(TAG, "LED init failed");
+    } else {
+        led.ledTest(kLedLevel, 200);        // quick test sequence
+    }
 
-    // Temporary LED test: red, green, blue for 1 s each, then off.
-    led.setColor(64, 0, 0);
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    led.setColor(0, 64, 0);
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    led.setColor(0, 0, 64);
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    led.off();
+    // Startup failure: report it, show red and stop here. No return: leaving
+    // app_main would destroy all objects above, including the LED driver.
+    auto fail = [&led](const char* what) {
+        ESP_LOGE(TAG, "%s init failed", what);
+        led.setColor(kLedLevel, 0, 0);
+        while (true) vTaskDelay(portMAX_DELAY);
+    };
 
     I2cBus bus(kSdaPin, kSclPin);
     Veml6040 veml(bus);
@@ -44,19 +48,11 @@ extern "C" void app_main(void) {
     GpioButton modeButton(kModeButtonPin);
     GpioButton memoryButton(kMemoryButtonPin);
 
-    if (!veml.init()) {
-        ESP_LOGE(TAG, "VEML6040 init failed");
-        return;
-    }
-    if (!oled.init()) {
-        ESP_LOGE(TAG, "SSD1306 init failed");
-        return;
-    }
-    if (!bme.init()) {
-        ESP_LOGE(TAG, "BME688 init failed");
-        return;
-    }
+    if (!veml.init()) fail("VEML6040");
+    if (!oled.init()) fail("SSD1306");
+    if (!bme.init()) fail("BME688");
 
+    led.setColor(0, kLedLevel, 0);  // all devices are up
     App app(veml, bme, oled, modeButton, memoryButton);
 
     while (true) {
