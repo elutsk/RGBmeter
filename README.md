@@ -61,8 +61,8 @@ from the source and shield it from ambient light.
 | Bosch BME68x environmental sensor | I2C | 0x77 |
 | Two push buttons to GND | GPIO | GPIO11, GPIO10 |
 
-- [github.com/WMnologo](https://web.archive.org/web/20250502125222/https://github.com/WMnologo)
-  ESP32-S3 Super Mini board author archived GitHub repository
+- [Super Mini Official](https://www.nologo.tech/en/product/esp32/esp32s3supermini/)
+  ESP32-S3 Super Mini board author official website on Chinese
 - [ESP32-S3 Super Mini CS](media/Nologo_ESP32-S3_SuperMini_CS.png)
   ESP32-S3 Super Mini board original circuit schematics by Nologo
 - [ESP32-S3 Super Mini Wiki](https://www.espboards.dev/esp32/esp32-s3-super-mini)
