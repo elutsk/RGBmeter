@@ -20,6 +20,7 @@ constexpr gpio_num_t kMemoryButtonPin = GPIO_NUM_10;  // button 2
 constexpr gpio_num_t kLedPin = GPIO_NUM_48;           // on-board WS2812
 constexpr int kTickPeriodMs = 200;                    // longer than the 160 ms VEML6040 integration time
 constexpr uint8_t kLedLevel = 64;                  // RGB LED brightness
+uint8_t vLedDimmer = kLedLevel;                  // RGB LED dimmer if all ok
 
 }  // namespace
 
@@ -58,5 +59,6 @@ extern "C" void app_main(void) {
     while (true) {
         app.tick();
         vTaskDelay(pdMS_TO_TICKS(kTickPeriodMs));
+        if (vLedDimmer) led.setColor(0, --vLedDimmer, 0);  // green color dimmer
     }
 }
