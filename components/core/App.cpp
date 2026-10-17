@@ -20,6 +20,10 @@ void drawChannel(IDisplay& display, int row, char label, uint16_t value) {
 constexpr int kMarkerX = 128 - 6;
 constexpr int kMarkerY = 0;
 
+// Status screen: small font, so longer lines fit (21 characters at scale 1).
+constexpr const char* kTitle = "RGBmeter v1";
+constexpr int kStatusScale = 2;
+
 // Shows current - saved with a sign: "+11", "-44", and plain "0" when equal.
 void drawDelta(IDisplay& display, int row, char label, uint16_t current, uint16_t saved) {
     const int delta = static_cast<int>(current) - static_cast<int>(saved);
@@ -34,8 +38,8 @@ void drawDelta(IDisplay& display, int row, char label, uint16_t current, uint16_
 
 }  // namespace
 
-App::App(IColorSensor& colorSensor, IClimateSensor& climateSensor, IDisplay& display, IButton& modeButton, IButton& memoryButton)
-    : colorSensor_(colorSensor), climateSensor_(climateSensor), display_(display), modeButton_(modeButton), memoryButton_(memoryButton) {}
+App::App(IColorSensor& colorSensor, IClimateSensor& climateSensor, IVoltageSensor& vbus, IDisplay& display, IButton& modeButton, IButton& memoryButton)
+    : colorSensor_(colorSensor), climateSensor_(climateSensor), vbus_(vbus), display_(display), modeButton_(modeButton), memoryButton_(memoryButton) {}
 
 void App::tick() {
     handleButtons();
@@ -47,6 +51,9 @@ void App::tick() {
     case Mode::Climate:
         renderClimate();
         break;
+    case Mode::Status:
+        renderStatus();
+        break;
     }
 
     // Nothing useful to do on failure here: the next tick will try again.
@@ -54,23 +61,38 @@ void App::tick() {
 }
 
 void App::handleButtons() {
-    if (modeButton_.wasShortClicked()) {
-        mode_ = (mode_ == Mode::Rgb) ? Mode::Climate : Mode::Rgb;
-        hasLastShown_ = false;  // it belongs to the previous visit of the RGB screen
-    }
-    if (modeButton_.wasLongClicked()) powerRequested_ = true;  // reserved for power saving
+    // Read all events on every tick, even those that are ignored on the
+    // current screen: otherwise they stay latched and fire later.
+    const bool modeShort = modeButton_.wasShortClicked();
+    const bool modeLong = modeButton_.wasLongClicked();
+    const bool memoryShort = memoryButton_.wasShortClicked();
+    const bool memoryLong = memoryButton_.wasLongClicked();
 
-    // Read both memory events on every tick, so they never stay latched,
-    // but act on them only on the RGB screen.
-    const bool save = memoryButton_.wasShortClicked();
-    const bool clear = memoryButton_.wasLongClicked();
-    if (mode_ != Mode::Rgb) return;
-
-    if (save && hasLastShown_) {
-        memory_ = lastShown_;
-        hasMemory_ = true;
+    // Button 1 first. Ignored on the Status screen: reserved for settings.
+    if (mode_ != Mode::Status) {
+        if (modeShort) {
+            mode_ = (mode_ == Mode::Rgb) ? Mode::Climate : Mode::Rgb;
+            hasLastShown_ = false;  // it belongs to the previous visit of the RGB screen
+        }
+        if (modeLong) powerRequested_ = true;  // reserved for power saving
     }
-    if (clear) hasMemory_ = false;
+
+    // Then button 2, applied to the screen that is current after button 1.
+    switch (mode_) {
+    case Mode::Rgb:
+        if (memoryShort && hasLastShown_) {
+            memory_ = lastShown_;
+            hasMemory_ = true;
+        }
+        if (memoryLong) hasMemory_ = false;
+        break;
+    case Mode::Climate:
+        if (memoryShort) mode_ = Mode::Status;
+        break;
+    case Mode::Status:
+        if (memoryShort) mode_ = Mode::Climate;
+        break;
+    }
 }
 
 void App::renderRgb() {
@@ -115,4 +137,17 @@ void App::renderClimate() {
     display_.drawText(0, 2 * kRowPitch, line, kTextScale);
     std::snprintf(line, sizeof(line), "mmHg %4.1f", static_cast<double>(sample.pressureHpa * 0.75f));
     display_.drawText(0, 3 * kRowPitch, line, kTextScale);
+}
+
+void App::renderStatus() {
+    display_.drawText(0, 0, kTitle, kStatusScale);
+
+    int millivolts = 0;
+    if (vbus_.readMillivolts(millivolts)) {
+        char line[24];
+        std::snprintf(line, sizeof(line), "vBus %1.3fV", (float)(millivolts / 1000.0f));
+        display_.drawText(0, kRowPitch, line, kStatusScale);
+    } else {
+        display_.drawText(0, kRowPitch, "vBus error", kStatusScale);
+    }
 }

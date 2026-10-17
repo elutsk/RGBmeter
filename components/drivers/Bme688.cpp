@@ -25,8 +25,7 @@ constexpr BME68X_INTF_RET_TYPE kBusError = BME68X_E_COM_FAIL;
 
 }  // namespace
 
-Bme688::Bme688(I2cBus& bus)
-{
+Bme688::Bme688(I2cBus& bus) {
     i2c_device_config_t config = {};
     config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
     config.device_address = kAddress;
@@ -34,15 +33,13 @@ Bme688::Bme688(I2cBus& bus)
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus.handle(), &config, &dev_));
 }
 
-Bme688::~Bme688()
-{
+Bme688::~Bme688() {
     if (dev_ != nullptr) {
         i2c_master_bus_rm_device(dev_);
     }
 }
 
-bool Bme688::init()
-{
+bool Bme688::init() {
     bme_.intf = BME68X_I2C_INTF;
     bme_.intf_ptr = this;  // passed back to busRead / busWrite / delayUs
     bme_.read = &Bme688::busRead;
@@ -70,8 +67,7 @@ bool Bme688::init()
     return bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heater, &bme_) == BME68X_OK;
 }
 
-bool Bme688::read(ClimateSample& out)
-{
+bool Bme688::read(ClimateSample& out) {
     if (bme68x_set_op_mode(BME68X_FORCED_MODE, &bme_) != BME68X_OK) {
         return false;
     }
@@ -92,16 +88,14 @@ bool Bme688::read(ClimateSample& out)
     return true;
 }
 
-BME68X_INTF_RET_TYPE Bme688::busRead(uint8_t reg, uint8_t* data, uint32_t len, void* intf)
-{
+BME68X_INTF_RET_TYPE Bme688::busRead(uint8_t reg, uint8_t* data, uint32_t len, void* intf) {
     Bme688* self = static_cast<Bme688*>(intf);
     // Write the register address, repeated START, read 'len' bytes.
     const esp_err_t err = i2c_master_transmit_receive(self->dev_, &reg, 1, data, len, kTimeoutMs);
     return err == ESP_OK ? kBusOk : kBusError;
 }
 
-BME68X_INTF_RET_TYPE Bme688::busWrite(uint8_t reg, const uint8_t* data, uint32_t len, void* intf)
-{
+BME68X_INTF_RET_TYPE Bme688::busWrite(uint8_t reg, const uint8_t* data, uint32_t len, void* intf) {
     Bme688* self = static_cast<Bme688*>(intf);
     if (len > kMaxWriteLen) {
         return kBusError;
@@ -115,8 +109,7 @@ BME68X_INTF_RET_TYPE Bme688::busWrite(uint8_t reg, const uint8_t* data, uint32_t
     return err == ESP_OK ? kBusOk : kBusError;
 }
 
-void Bme688::delayUs(uint32_t us, void* /*intf*/)
-{
+void Bme688::delayUs(uint32_t us, void* /*intf*/) {
     if (us < kBusyWaitLimitUs) {
         esp_rom_delay_us(us);
         return;

@@ -48,9 +48,8 @@ extern "C" void app_main(void) {
 
     if (!led.init()) {
         ESP_LOGE(TAG, "LED init failed");
-        vTaskDelay(pdMS_TO_TICKS(900));     // delay required to warm up OLED display
     } else {
-        led.ledTest(kLedLevel, 300);        // quick test sequence
+        led.ledTest(kLedLevel, 200);        // quick test sequence
     }
 
     if (!oled.init()) fail("SSD1306");
@@ -59,20 +58,12 @@ extern "C" void app_main(void) {
     if (!vbus.init()) fail("VBUS ADC");
 
     led.setColor(0, kLedLevel, 0);  // all devices are up
-    App app(veml, bme, oled, modeButton, memoryButton);
+    App app(veml, bme, vbus, oled, modeButton, memoryButton);
 
-    uint8_t vLedDimmer = kLedLevel;                     // temporary: fade the green LED out
-    constexpr int kVbusLogTicks = 1000 / kTickPeriodMs;  // temporary: log VBUS once per second
-    int vbusLogCountdown = 0;
+    uint8_t vLedDimmer = kLedLevel;  // temporary: fade the green LED out
     while (true) {
         app.tick();
         vTaskDelay(pdMS_TO_TICKS(kTickPeriodMs));
         if (vLedDimmer) led.setColor(0, --vLedDimmer, 0);  // green color dimmer
-
-        if (--vbusLogCountdown <= 0) {
-            vbusLogCountdown = kVbusLogTicks;
-            int millivolts = 0;
-            if (vbus.readMillivolts(millivolts)) ESP_LOGI(TAG, "VBUS %d mV", millivolts);
-        }
     }
 }
