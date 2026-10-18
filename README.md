@@ -10,9 +10,9 @@ sensor.
   <img src="media/screens.jpg" width="100%" alt="Prototype screens">
 </p>
 
-Handwritten in C++14 on top of ESP-IDF 5.5. 
-VS Code was used for hacking. 
-Kindly reviewed and commented by Claude Opus.
+- Handwritten in C++14 on top of ESP-IDF 5.5. 
+- VS Code was used for hacking. 
+- Kindly reviewed, commented and partially documented by Claude Opus.
 
 ## Features
 
