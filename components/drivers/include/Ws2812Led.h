@@ -2,6 +2,7 @@
 
 #include "IRgbLed.h"
 #include "driver/gpio.h"
+#include "esp_timer.h"
 
 // Forward declaration of the library's internal struct: keeps "led_strip.h"
 // out of this header, like in Ssd1306Display.
@@ -18,15 +19,20 @@ public:
     Ws2812Led(const Ws2812Led&) = delete;
     Ws2812Led& operator=(const Ws2812Led&) = delete;
 
-    // Allocates an RMT channel for the LED. Returns false on failure.
+    // Allocates an RMT channel for the LED and the pulse timer. Returns false on failure.
     bool init();
 
     bool setColor(uint8_t red, uint8_t green, uint8_t blue) override;
     bool off() override;
+    bool pulse(uint8_t red, uint8_t green, uint8_t blue, uint32_t durationMs) override;
 
     void ledTest(uint8_t level, uint32_t delay);
 
 private:
+    // One-shot esp_timer callback that ends a pulse (trampoline, as in GpioButton).
+    static void onPulseEnd(void* arg);
+
     gpio_num_t pin_;
+    esp_timer_handle_t pulseTimer_ = nullptr;
     led_strip_t* handle_ = nullptr;  // same type as the library's led_strip_handle_t
 };

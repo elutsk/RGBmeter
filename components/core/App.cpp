@@ -1,6 +1,6 @@
 #include "App.h"
-
 #include <cstdio>
+#include "Power.h"
 
 namespace {
 
@@ -24,6 +24,12 @@ constexpr int kMarkerY = 0;
 constexpr const char* kTitle = "RGBmeter v1";
 constexpr int kStatusScale = 2;
 
+// Low battery alert: a short red flash every 10 s while on battery below 20 %.
+constexpr int kLowBatteryPercent = 20;
+constexpr int kAlertPeriodMs = 10000;
+constexpr uint32_t kAlertPulseMs = 100;
+constexpr uint8_t kAlertLevel = 64;
+
 // Shows current - saved with a sign: "+11", "-44", and plain "0" when equal.
 void drawDelta(IDisplay& display, int row, char label, uint16_t current, uint16_t saved) {
     const int delta = static_cast<int>(current) - static_cast<int>(saved);
@@ -38,8 +44,8 @@ void drawDelta(IDisplay& display, int row, char label, uint16_t current, uint16_
 
 }  // namespace
 
-App::App(IColorSensor& colorSensor, IClimateSensor& climateSensor, IVoltageSensor& vbus, IDisplay& display, IButton& modeButton, IButton& memoryButton)
-    : colorSensor_(colorSensor), climateSensor_(climateSensor), vbus_(vbus), display_(display), modeButton_(modeButton), memoryButton_(memoryButton) {}
+App::App(IColorSensor& colorSensor, IClimateSensor& climateSensor, IVoltageSensor& vbus, IDisplay& display, IRgbLed& led, IButton& modeButton, IButton& memoryButton, int tickPeriodMs)
+    : colorSensor_(colorSensor), climateSensor_(climateSensor), vbus_(vbus), display_(display), led_(led), modeButton_(modeButton), memoryButton_(memoryButton), tickPeriodMs_(tickPeriodMs) {}
 
 void App::tick() {
     handleButtons();
@@ -142,12 +148,26 @@ void App::renderClimate() {
 void App::renderStatus() {
     display_.drawText(0, 0, kTitle, kStatusScale);
 
-    int millivolts = 0;
-    if (vbus_.readMillivolts(millivolts)) {
-        char line[24];
-        std::snprintf(line, sizeof(line), "vBus %1.3fV", (float)(millivolts / 1000.0f));
-        display_.drawText(0, kRowPitch, line, kStatusScale);
-    } else {
+    int vbusMillivolts = 0;
+    if (!vbus_.readMillivolts(vbusMillivolts)) {
         display_.drawText(0, kRowPitch, "vBus error", kStatusScale);
+        return;
     }
+
+    const PowerStatus power = evaluatePower(vbusMillivolts);
+    char line[24];
+    std::snprintf(line, sizeof(line), power.onUsb ? "vBus %.2f V" : "vBat %.2f V", power.millivolts / 1000.0);
+    display_.drawText(0, kRowPitch, line, kStatusScale);
+}
+
+void App::updateBatteryAlert() {
+    alertElapsedMs_ += tickPeriodMs_;
+    if (alertElapsedMs_ < kAlertPeriodMs) return;
+    alertElapsedMs_ = 0;
+
+    int vbusMillivolts = 0;
+    if (!vbus_.readMillivolts(vbusMillivolts)) return;
+
+    const PowerStatus power = evaluatePower(vbusMillivolts);
+    if (!power.onUsb && power.batteryPercent < kLowBatteryPercent) led_.pulse(kAlertLevel, 0, 0, kAlertPulseMs);
 }

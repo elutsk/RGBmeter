@@ -57,13 +57,11 @@ extern "C" void app_main(void) {
     if (!bme.init()) fail("BME688");
     if (!vbus.init()) fail("VBUS ADC");
 
-    led.setColor(0, kLedLevel, 0);  // all devices are up
-    App app(veml, bme, vbus, oled, modeButton, memoryButton);
+    led.pulse(0, kLedLevel, 0, 1000);  // all devices are up: green for 1 s
+    App app(veml, bme, vbus, oled, led, modeButton, memoryButton, kTickPeriodMs);    
 
-    uint8_t vLedDimmer = kLedLevel;  // temporary: fade the green LED out
     while (true) {
         app.tick();
         vTaskDelay(pdMS_TO_TICKS(kTickPeriodMs));
-        if (vLedDimmer) led.setColor(0, --vLedDimmer, 0);  // green color dimmer
     }
 }

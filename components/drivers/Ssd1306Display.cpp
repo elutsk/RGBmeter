@@ -9,7 +9,7 @@ namespace {
 constexpr uint8_t kAddress = 0x3C;
 constexpr uint16_t kWidth = 128;
 constexpr uint16_t kHeight = 64;
-constexpr int64_t kPowerUpDelayUs = 500 * 1000;  // panel ignores commands this long after power-up
+constexpr int64_t kPowerUpDelayUs = 1000 * 1000;  // panel ignores commands this long after power-up
 
 }  // namespace
 
