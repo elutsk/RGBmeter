@@ -13,6 +13,10 @@ Ws2812Led::~Ws2812Led() {
 }
 
 bool Ws2812Led::init() {
+    // After a wake-up from deep sleep the pin is still held low by sleep():
+    // release it, otherwise the RMT cannot drive it. Harmless if not held.
+    gpio_hold_dis(pin_);
+
     // Zero-initialized fields mean "use the driver defaults": GRB color order
     // (the order WS2812 expects), 10 MHz RMT resolution, default clock source
     // and memory size.
@@ -62,4 +66,27 @@ bool Ws2812Led::setColor(uint8_t red, uint8_t green, uint8_t blue) {
 
 bool Ws2812Led::off() {
     return handle_ != nullptr && led_strip_clear(handle_) == ESP_OK;
+}
+
+void Ws2812Led::sleep() {
+    if (pulseTimer_ != nullptr) esp_timer_stop(pulseTimer_);  // error if not running is fine
+    if (handle_ != nullptr) {
+        led_strip_clear(handle_);  // WS2812 off
+        led_strip_del(handle_);    // frees the RMT channel: the pin is a plain GPIO again
+        handle_ = nullptr;
+    }
+
+    gpio_config_t io = {};
+    io.pin_bit_mask = 1ULL << pin_;
+    io.mode = GPIO_MODE_OUTPUT;
+    io.pull_up_en = GPIO_PULLUP_DISABLE;
+    io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io.intr_type = GPIO_INTR_DISABLE;
+    gpio_config(&io);
+    gpio_set_level(pin_, 0);
+
+    // GPIO48 is a digital pin, not an RTC one: on the ESP32-S3 it keeps its state
+    // in deep sleep only with both calls (see the gpio_hold_en() notes in ESP-IDF).
+    gpio_hold_en(pin_);
+    gpio_deep_sleep_hold_en();
 }

@@ -28,6 +28,12 @@ public:
 
     void ledTest(uint8_t level, uint32_t delay);
 
+    // Before deep sleep: turns the LED off, releases the RMT channel and holds the
+    // pin low. The board also has a plain red LED (1k to GND) on this pin, which
+    // would glow from the pin's default state in deep sleep. After this the object
+    // is not usable until init(), which in our case runs after the wake-up reboot.
+    void sleep();
+
 private:
     // One-shot esp_timer callback that ends a pulse (trampoline, as in GpioButton).
     static void onPulseEnd(void* arg);

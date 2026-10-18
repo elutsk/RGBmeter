@@ -99,7 +99,7 @@ extern "C" void app_main(void) {
         const App::SleepReason reason = app.sleepRequest();
         if (reason != App::SleepReason::None) {
             ESP_LOGI(TAG, "sleep requested: %s", App::sleepReasonName(reason));
-            led.off();
+            led.sleep();
             oled.sleep();
             veml.shutdown();
             DeepSleep::enter(kModeButtonPin);  // never returns: waking up is a reboot
