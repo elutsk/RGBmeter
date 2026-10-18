@@ -6,6 +6,7 @@
 #include "Veml6040.h"
 #include "Ws2812Led.h"
 #include "AdcVoltage.h"
+#include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -23,6 +24,24 @@ constexpr int kTickPeriodMs = 200;                    // longer than the 160 ms 
 constexpr uint8_t kLedLevel = 64;                  // RGB LED brightness
 constexpr gpio_num_t kVbusPin = GPIO_NUM_3;           // VBUS through the on-board 100k/100k divider
 constexpr int kVbusDividerRatio = 2;                  // (100k + 100k) / 100k
+
+// Diagnostics: logs every 7-bit address that answers with ACK.
+void scanBus(const I2cBus& bus) {
+    constexpr uint16_t kFirstAddress = 0x08;
+    constexpr uint16_t kLastAddress = 0x77;
+    constexpr int kScanTimeoutMs = 50;
+    int found = 0;
+    for (uint16_t address = kFirstAddress; address <= kLastAddress; ++address) {
+        const esp_err_t err = i2c_master_probe(bus.handle(), address, kScanTimeoutMs);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "scan: 0x%02X ACK", address);
+            ++found;
+        } else if (err != ESP_ERR_NOT_FOUND) {
+            ESP_LOGW(TAG, "scan: 0x%02X %s", address, esp_err_to_name(err));
+        }
+    }
+    ESP_LOGI(TAG, "scan: %d device(s) found, SDA=%d SCL=%d", found, bus.sdaLevel(), bus.sclLevel());
+}
 
 }  // namespace
 
@@ -68,10 +87,10 @@ extern "C" void app_main(void) {
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
     }
+    scanBus(bus);  // after the attempts: compare a good start with a bad one
     if (!oledReady) fail("SSD1306");
     if (!veml.init()) fail("VEML6040");
     if (!bme.init()) fail("BME688");
-    if (!vbus.init()) fail("VBUS ADC");
 
     led.pulse(0, kLedLevel, 0, 1000);  // all devices are up: green for 1 s
     App app(veml, bme, vbus, oled, led, modeButton, memoryButton, kTickPeriodMs);    
