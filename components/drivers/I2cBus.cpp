@@ -1,8 +1,7 @@
 #include "I2cBus.h"
 #include "esp_err.h"
-#include "driver/gpio.h"
 
-I2cBus::I2cBus(gpio_num_t sda, gpio_num_t scl) : sda_(sda), scl_(scl) {
+  I2cBus::I2cBus(gpio_num_t sda, gpio_num_t scl) {
     i2c_master_bus_config_t config = {};
     config.i2c_port = port_;
     config.sda_io_num = sda;
@@ -21,12 +20,4 @@ I2cBus::~I2cBus() {
     if (handle_ != nullptr) {
         i2c_del_master_bus(handle_);
     }
-}
-
-int I2cBus::sdaLevel() const {
-    return gpio_get_level(sda_);
-}
-
-int I2cBus::sclLevel() const {
-    return gpio_get_level(scl_);
 }

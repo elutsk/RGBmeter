@@ -24,6 +24,7 @@ constexpr int kTickPeriodMs = 200;                    // longer than the 160 ms 
 constexpr uint8_t kLedLevel = 64;                  // RGB LED brightness
 constexpr gpio_num_t kVbusPin = GPIO_NUM_3;           // VBUS through the on-board 100k/100k divider
 constexpr int kVbusDividerRatio = 2;                  // (100k + 100k) / 100k
+constexpr bool kBusDiagMode = false;                // i2c + vbus diagnostics mode
 
 // Diagnostics: logs every 7-bit address that answers with ACK.
 void scanBus(const I2cBus& bus) {
@@ -40,7 +41,7 @@ void scanBus(const I2cBus& bus) {
             ESP_LOGW(TAG, "scan: 0x%02X %s", address, esp_err_to_name(err));
         }
     }
-    ESP_LOGI(TAG, "scan: %d device(s) found, SDA=%d SCL=%d", found, bus.sdaLevel(), bus.sclLevel());
+    ESP_LOGI(TAG, "scan: %d device(s) found", found);
 }
 
 }  // namespace
@@ -71,24 +72,15 @@ extern "C" void app_main(void) {
         led.ledTest(kLedLevel, 200);        // quick test sequence
     }
 
-    // VBUS first: the supply voltage is the first suspect when the display fails.
     if (!vbus.init()) fail("VBUS ADC");
-    int startupMillivolts = 0;
-    if (vbus.readMillivolts(startupMillivolts)) ESP_LOGI(TAG, "startup VBUS %d mV (uncorrected)", startupMillivolts);
-    ESP_LOGI(TAG, "I2C idle levels: SDA=%d SCL=%d", bus.sdaLevel(), bus.sclLevel());
-
-    // Diagnostics: several attempts, each one logged by the display driver.
-    constexpr int kOledAttempts = 5;
-    bool oledReady = false;
-    for (int attempt = 1; attempt <= kOledAttempts && !oledReady; ++attempt) {
-        oledReady = oled.init();
-        if (!oledReady) {
-            ESP_LOGW(TAG, "SSD1306 attempt %d of %d failed", attempt, kOledAttempts);
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
+    if (kBusDiagMode) {
+        // VBUS first: the supply voltage is the first suspect when something fails.
+        int startupMillivolts = 0;
+        if (vbus.readMillivolts(startupMillivolts)) ESP_LOGI(TAG, "startup VBUS %d mV (uncorrected)", startupMillivolts);
+        scanBus(bus);  // scan i2c bus for all connected peripherals
     }
-    scanBus(bus);  // after the attempts: compare a good start with a bad one
-    if (!oledReady) fail("SSD1306");
+
+    if (!oled.init()) fail("SSD1306");
     if (!veml.init()) fail("VEML6040");
     if (!bme.init()) fail("BME688");
 

@@ -28,6 +28,5 @@ public:
 
 private:
     i2c_port_num_t port_;
-    i2c_master_bus_handle_t bus_;  // only for the diagnostic probe
     ssd1306_t* handle_ = nullptr;  // same type as the library's ssd1306_handle_t
 };
