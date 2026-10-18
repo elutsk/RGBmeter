@@ -6,6 +6,7 @@ struct PowerStatus {
     bool onUsb;          // true: powered from USB; false: from the battery
     int millivolts;      // corrected voltage: VBUS on USB, battery voltage on battery
     int batteryPercent;  // 0..100, meaningful only when onUsb is false
+    bool batteryEmpty;   // true: on battery and below 0 % (the battery guard threshold)
 };
 
 // vbusMillivolts: the value reported by the VBUS voltage sensor (uncorrected).

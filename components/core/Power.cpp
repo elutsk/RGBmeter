@@ -25,6 +25,7 @@ PowerStatus evaluatePower(int vbusMillivolts) {
     }
 
     status.millivolts = vbusMillivolts + kBatteryCorrectionMv;
+    status.batteryEmpty = status.millivolts < kBatteryEmptyMv;
     if (status.millivolts <= kBatteryEmptyMv) {
         status.batteryPercent = 0;
     } else if (status.millivolts >= kBatteryFullMv) {

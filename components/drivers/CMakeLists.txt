@@ -1,4 +1,4 @@
-idf_component_register(SRCS "I2cBus.cpp" "Veml6040.cpp" "Ssd1306Display.cpp" "GpioButton.cpp" "Bme688.cpp" "Ws2812Led.cpp" "AdcVoltage.cpp"
+idf_component_register(SRCS "I2cBus.cpp" "Veml6040.cpp" "Ssd1306Display.cpp" "GpioButton.cpp" "Bme688.cpp" "Ws2812Led.cpp" "AdcVoltage.cpp" "DeepSleep.cpp"
                        INCLUDE_DIRS "include"
                        REQUIRES esp_driver_i2c esp_driver_gpio esp_timer esp_adc bme68x core)
 

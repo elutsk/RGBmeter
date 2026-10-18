@@ -30,6 +30,10 @@ constexpr int kAlertPeriodMs = 10000;
 constexpr uint32_t kAlertPulseMs = 100;
 constexpr uint8_t kAlertLevel = 64;
 
+// Automatic sleep, both only on battery.
+constexpr int kEmptyChecksToSleep = 3;                // battery guard: 3 checks in a row below 0 %, 10 s apart
+constexpr int kInactivityTimeoutMs = 10 * 60 * 1000;  // no button events for 10 minutes
+
 // Shows current - saved with a sign: "+11", "-44", and plain "0" when equal.
 void drawDelta(IDisplay& display, int row, char label, uint16_t current, uint16_t saved) {
     const int delta = static_cast<int>(current) - static_cast<int>(saved);
@@ -64,6 +68,9 @@ void App::tick() {
 
     // Nothing useful to do on failure here: the next tick will try again.
     (void)display_.flush();
+
+    updateBattery();
+    updateInactivity();
 }
 
 void App::handleButtons() {
@@ -74,13 +81,18 @@ void App::handleButtons() {
     const bool memoryShort = memoryButton_.wasShortClicked();
     const bool memoryLong = memoryButton_.wasLongClicked();
 
-    // Button 1 first. Ignored on the Status screen: reserved for settings.
+    // Any button event is activity, even one that is ignored on this screen.
+    if (modeShort || modeLong || memoryShort || memoryLong) inactiveMs_ = 0;
+
+    // Button 1 first. Long click: sleep, on any screen.
+    if (modeLong) requestSleep(SleepReason::Button);
+
+    // Short click: ignored on the Status screen, reserved for settings.
     if (mode_ != Mode::Status) {
         if (modeShort) {
             mode_ = (mode_ == Mode::Rgb) ? Mode::Climate : Mode::Rgb;
             hasLastShown_ = false;  // it belongs to the previous visit of the RGB screen
         }
-        if (modeLong) powerRequested_ = true;  // reserved for power saving
     }
 
     // Then button 2, applied to the screen that is current after button 1.
@@ -160,20 +172,55 @@ void App::renderStatus() {
     display_.drawText(0, kRowPitch, line, kStatusScale);
 }
 
-void App::updateBatteryAlert() {
+void App::updateBattery() {
     alertElapsedMs_ += tickPeriodMs_;
     if (alertElapsedMs_ < kAlertPeriodMs) return;
     alertElapsedMs_ = 0;
 
     int vbusMillivolts = 0;
-    if (!vbus_.readMillivolts(vbusMillivolts)) return;
+    if (!vbus_.readMillivolts(vbusMillivolts)) return;  // a failed read changes nothing
 
     const PowerStatus power = evaluatePower(vbusMillivolts);
-    if (!power.onUsb) {
+    onBattery_ = !power.onUsb;
+    if (onBattery_) {
         if (power.batteryPercent < kLowBatteryPercent) {
             led_.pulse(kAlertLevel, 0, 0, kAlertPulseMs);
         } else {
             led_.pulse(0, kAlertLevel, 0, kAlertPulseMs);
         }
-    } 
+    }
+
+    // Battery guard: only several empty readings in a row put the device to sleep,
+    // a single low reading may be noise or a short dip under load.
+    emptyChecks_ = power.batteryEmpty ? emptyChecks_ + 1 : 0;
+    if (emptyChecks_ >= kEmptyChecksToSleep) requestSleep(SleepReason::LowBattery);
+}
+
+void App::updateInactivity() {
+    // Counts only on battery. On USB it stays at 0, so the 10 minutes start
+    // from the moment the device switches to the battery.
+    if (!onBattery_) {
+        inactiveMs_ = 0;
+        return;
+    }
+    inactiveMs_ += tickPeriodMs_;
+    if (inactiveMs_ >= kInactivityTimeoutMs) requestSleep(SleepReason::Inactivity);
+}
+
+void App::requestSleep(SleepReason reason) {
+    if (sleepRequest_ == SleepReason::None) sleepRequest_ = reason;  // the first reason wins
+}
+
+const char* App::sleepReasonName(SleepReason reason) {
+    switch (reason) {
+    case SleepReason::None:
+        return "none";
+    case SleepReason::Button:
+        return "button";
+    case SleepReason::LowBattery:
+        return "low battery";
+    case SleepReason::Inactivity:
+        return "inactivity";
+    }
+    return "unknown";  // not reached: the switch covers all values
 }

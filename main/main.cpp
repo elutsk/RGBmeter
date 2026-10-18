@@ -6,6 +6,7 @@
 #include "Veml6040.h"
 #include "Ws2812Led.h"
 #include "AdcVoltage.h"
+#include "DeepSleep.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -25,6 +26,7 @@ constexpr uint8_t kLedLevel = 64;                  // RGB LED brightness
 constexpr gpio_num_t kVbusPin = GPIO_NUM_3;           // VBUS through the on-board 100k/100k divider
 constexpr int kVbusDividerRatio = 2;                  // (100k + 100k) / 100k
 constexpr bool kBusDiagMode = false;                // i2c + vbus diagnostics mode
+constexpr uint32_t kWakeHoldMs = 750;                 // plus about 250 ms of boot: about 1 s, like a long click
 
 // Diagnostics: logs every 7-bit address that answers with ACK.
 void scanBus(const I2cBus& bus) {
@@ -49,6 +51,10 @@ void scanBus(const I2cBus& bus) {
 // Composition root: creates the concrete hardware objects,
 // wires them into App through interfaces, and runs the main loop.
 extern "C" void app_main(void) {
+    // Woken up from deep sleep by button 1: only a long press really wakes the device,
+    // an accidental short one sends it straight back to sleep. Done before anything else.
+    if (DeepSleep::wokeByButton() && !DeepSleep::confirmWake(kModeButtonPin, kWakeHoldMs)) DeepSleep::enter(kModeButtonPin);
+
     Ws2812Led led(kLedPin);
     I2cBus bus(kSdaPin, kSclPin);
     Veml6040 veml(bus);
@@ -89,6 +95,16 @@ extern "C" void app_main(void) {
 
     while (true) {
         app.tick();
+
+        const App::SleepReason reason = app.sleepRequest();
+        if (reason != App::SleepReason::None) {
+            ESP_LOGI(TAG, "sleep requested: %s", App::sleepReasonName(reason));
+            led.off();
+            oled.sleep();
+            veml.shutdown();
+            DeepSleep::enter(kModeButtonPin);  // never returns: waking up is a reboot
+        }
+
         vTaskDelay(pdMS_TO_TICKS(kTickPeriodMs));
     }
 }
