@@ -19,7 +19,13 @@ public:
     // Some third-party drivers identify the bus by port number, not by handle.
     i2c_port_num_t port() const { return port_; }
 
-private:
+    // Current logic level of the lines (1 = high), for diagnostics.
+    int sdaLevel() const;
+    int sclLevel() const;    
+
+    private:
+    gpio_num_t sda_;
+    gpio_num_t scl_;
     i2c_port_num_t port_ = I2C_NUM_0;
     i2c_master_bus_handle_t handle_ = nullptr;
 };

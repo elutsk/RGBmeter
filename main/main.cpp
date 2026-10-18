@@ -52,7 +52,23 @@ extern "C" void app_main(void) {
         led.ledTest(kLedLevel, 200);        // quick test sequence
     }
 
-    if (!oled.init()) fail("SSD1306");
+    // VBUS first: the supply voltage is the first suspect when the display fails.
+    if (!vbus.init()) fail("VBUS ADC");
+    int startupMillivolts = 0;
+    if (vbus.readMillivolts(startupMillivolts)) ESP_LOGI(TAG, "startup VBUS %d mV (uncorrected)", startupMillivolts);
+    ESP_LOGI(TAG, "I2C idle levels: SDA=%d SCL=%d", bus.sdaLevel(), bus.sclLevel());
+
+    // Diagnostics: several attempts, each one logged by the display driver.
+    constexpr int kOledAttempts = 5;
+    bool oledReady = false;
+    for (int attempt = 1; attempt <= kOledAttempts && !oledReady; ++attempt) {
+        oledReady = oled.init();
+        if (!oledReady) {
+            ESP_LOGW(TAG, "SSD1306 attempt %d of %d failed", attempt, kOledAttempts);
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
+    if (!oledReady) fail("SSD1306");
     if (!veml.init()) fail("VEML6040");
     if (!bme.init()) fail("BME688");
     if (!vbus.init()) fail("VBUS ADC");

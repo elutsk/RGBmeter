@@ -169,5 +169,11 @@ void App::updateBatteryAlert() {
     if (!vbus_.readMillivolts(vbusMillivolts)) return;
 
     const PowerStatus power = evaluatePower(vbusMillivolts);
-    if (!power.onUsb && power.batteryPercent < kLowBatteryPercent) led_.pulse(kAlertLevel, 0, 0, kAlertPulseMs);
+    if (!power.onUsb) {
+        if (power.batteryPercent < kLowBatteryPercent) {
+            led_.pulse(kAlertLevel, 0, 0, kAlertPulseMs);
+        } else {
+            led_.pulse(0, kAlertLevel, 0, kAlertPulseMs);
+        }
+    } 
 }
