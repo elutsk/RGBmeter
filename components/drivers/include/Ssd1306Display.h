@@ -22,6 +22,11 @@ public:
     // Returns false if the panel does not respond.
     bool init();
 
+    // Puts the panel into sleep mode: display off, charge pump off.
+    // No wake() here: waking from deep sleep reboots the chip, and the
+    // panel is set up again from scratch by init().
+    bool sleep();
+
     void clear() override;
     void drawText(int x, int y, const char* text, int scale) override;
     bool flush() override;

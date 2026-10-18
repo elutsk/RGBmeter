@@ -17,6 +17,7 @@ constexpr uint8_t kCmdWhite = 0x0B;
 // CONF low byte: IT[6:4] = integration time, TRIG = bit 2,
 // AF = bit 1 (0 = auto mode), SD = bit 0 (0 = sensor enabled).
 constexpr uint8_t kIt160ms = 0x2 << 4;
+constexpr uint8_t kSd = 0x01;  // shutdown
 constexpr uint8_t kConfLow = kIt160ms;
 constexpr uint8_t kConfHigh = 0x00;
 
@@ -37,8 +38,17 @@ Veml6040::~Veml6040() {
 }
 
 bool Veml6040::init() {
+    return writeConf(kConfLow);
+}
+
+bool Veml6040::shutdown() {
+    // Same configuration, only SD set: init() later restores it by clearing SD.
+    return writeConf(kConfLow | kSd);
+}
+
+bool Veml6040::writeConf(uint8_t confLow) {
     // Write frame: command code, then data low byte, then data high byte.
-    const uint8_t frame[3] = {kCmdConf, kConfLow, kConfHigh};
+    const uint8_t frame[3] = {kCmdConf, confLow, kConfHigh};
     return i2c_master_transmit(dev_, frame, sizeof(frame), kTimeoutMs) == ESP_OK;
 }
 

@@ -1,6 +1,7 @@
 dependencies:
-  chill-sam/ssd1306:
-    version: "^1.1.2"
+  ssd1306:
+    git: https://github.com/elutsk/esp-ssd1306.git
+    version: 8d49316ed86c38a65a196a26eafd9b40022e2af3
     require: private
   espressif/led_strip:
     version: "^3.0.0"

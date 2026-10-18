@@ -47,17 +47,16 @@ bool Ssd1306Display::init() {
     const esp_err_t err = ssd1306_new_i2c(&config, &handle_);
     const long long tookMs = static_cast<long long>((esp_timer_get_time() - startUs) / 1000);
     if (err != ESP_OK) {
+        // On failure the library releases everything itself and leaves handle_ null.
         ESP_LOGE(TAG, "ssd1306_new_i2c: %s after %lld ms", esp_err_to_name(err), tookMs);
-        // The library sets the handle before the panel init sequence runs,
-        // so on failure it may be non-null: release it to avoid a leak.
-        if (handle_ != nullptr) {
-            ssd1306_del(handle_);
-            handle_ = nullptr;
-        }
         return false;
     }
     ESP_LOGI(TAG, "ssd1306_new_i2c: OK in %lld ms", tookMs);
     return true;
+}
+
+bool Ssd1306Display::sleep() {
+    return handle_ != nullptr && ssd1306_sleep(handle_) == ESP_OK;
 }
 
 void Ssd1306Display::clear() {

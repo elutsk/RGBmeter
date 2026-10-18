@@ -1,19 +1,4 @@
 dependencies:
-  chill-sam/ssd1306:
-    component_hash: 6be33faa92d913d198ef61f70d58708c4cebd5c93e74cf3e2a43446877cf04f6
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=5.3'
-    source:
-      registry_url: https://components.espressif.com/
-      type: service
-    targets:
-    - esp32
-    - esp32s2
-    - esp32s3
-    - esp32c3
-    version: 1.1.2
   espressif/led_strip:
     component_hash: 097f698887601de00bed7ff58f91b9e074fa1ae1bcf53582034b01191cc88e9f
     dependencies:
@@ -28,9 +13,24 @@ dependencies:
     source:
       type: idf
     version: 5.5.5
+  ssd1306:
+    component_hash: b0addd507dd009532c7eda0c8b8cdf29abac0c4d5249dd58e1f34e9348e3f7ef
+    dependencies:
+    - name: idf
+      version: '>=5.3'
+    source:
+      git: https://github.com/elutsk/esp-ssd1306.git
+      path: .
+      type: git
+    targets:
+    - esp32
+    - esp32s2
+    - esp32s3
+    - esp32c3
+    version: 8d49316ed86c38a65a196a26eafd9b40022e2af3
 direct_dependencies:
-- chill-sam/ssd1306
 - espressif/led_strip
-manifest_hash: 12e5a1a86ee99e86001dff60db6ac7bdc1872d9f6f660c6ff99abc4e48ae6168
+- ssd1306
+manifest_hash: ee1c1da0285ec226661a33801f3338603a796d0ec51baa8845cbe4cee72c9b2b
 target: esp32s3
 version: 2.0.0
