@@ -26,8 +26,13 @@ sensor.
   (hPa and mmHg) from the BME68x.
 - **Status** screen: firmware name and version, power source and voltage
   (`vBus` on USB, `vBat` on battery).
-- **Battery operation**: USB or battery power is detected automatically. A low
-  battery is signalled by a short red flash of the on-board RGB LED.
+- **Battery operation**: USB or battery power is detected automatically. On
+  battery the on-board RGB LED gives a short flash every 10 seconds: green
+  normally, red when the battery is low.
+- **Deep sleep**: a long click of button 1 on any screen puts the device to
+  sleep, holding button 1 for about 1 second wakes it up. On battery the device
+  also goes to sleep by itself after 10 minutes without any button press, or
+  when the battery is empty.
 - **Startup indication** with the on-board RGB LED: a quick red-green-blue
   self-test, then green for 1 second when all devices are up, or steady red if
   any device failed to start (the reason is printed to the serial log).
@@ -37,8 +42,9 @@ sensor.
 
 | Button | Screen | Short click | Long click (1 s) |
 |---|---|---|---|
-| Button 1 (GPIO11) | RGB, Climate | Switch between the RGB and Climate screens | Reserved |
-| Button 1 (GPIO11) | Status | Ignored (reserved for settings) | Ignored |
+| Button 1 (GPIO11) | RGB, Climate | Switch between the RGB and Climate screens | Deep sleep |
+| Button 1 (GPIO11) | Status | Ignored (reserved for settings) | Deep sleep |
+| Button 1 (GPIO11) | Sleeping | - | Wake up (hold for about 1 s) |
 | Button 2 (GPIO10) | RGB | Save the current reading as the reference | Clear the reference |
 | Button 2 (GPIO10) | Climate | Open the Status screen | - |
 | Button 2 (GPIO10) | Status | Back to the Climate screen | - |
@@ -47,7 +53,9 @@ sensor.
   as the button has been held for 1 second. Holding it longer does not repeat
   the long click.
 - The reference survives switching between screens. It is kept in RAM only and
-  is lost on power-off.
+  is lost on power-off and in deep sleep.
+- A short press while the device is sleeping is ignored: the device checks the
+  button for a moment and goes back to sleep.
 
 ## About the readings
 
@@ -74,7 +82,24 @@ VBUS is measured by the ADC on GPIO3 through an on-board 100k/100k divider.
   multimeter (within about 30 mV).
 - The battery level is linear between 3.4 V (0 %) and 4.2 V (100 %). Below
   about 3.3-3.35 V on the battery the ESP32 shuts down.
-- Below 20 % the RGB LED flashes red for 100 ms every 10 seconds.
+- On battery the RGB LED flashes for 100 ms every 10 seconds: green from 20 %
+  up, red below 20 %.
+- Battery guard: when the battery is below 0 % (3.4 V) in three checks in a
+  row, 10 seconds apart, the device goes to deep sleep. A single low reading
+  does not count, it may be noise or a short dip under load.
+- On battery, 10 minutes without any button press also put the device to deep
+  sleep. The time starts again from zero when USB is disconnected.
+
+### Deep sleep
+
+Before sleeping the device turns off the RGB LED, puts the OLED into sleep
+mode (display and charge pump off) and the VEML6040 into shutdown. The BME68x
+needs nothing: in forced mode it sleeps between measurements by itself. GPIO48
+is held low during sleep, so the on-board red LED on the same pin stays dark.
+
+Waking up from deep sleep is a full restart, the same as after power-on. The
+USB serial port also sleeps: to flash a sleeping board, wake it up first or
+hold BOOT and press RST.
 
 The board has its own TP4054 Li-ion charger. When USB is connected, the cell
 is charged up to 4.2 V at about 100 mA (10k PROG resistor), and a blue LED on
@@ -91,6 +116,7 @@ use a cell with its own protection circuit.
 | Bosch BME68x environmental sensor | I2C | 0x77 |
 | Two push buttons to GND | GPIO | GPIO11, GPIO10 |
 | On-board WS2812 RGB LED | RMT | GPIO48 |
+| On-board red LED (1k to GND), same pin as the WS2812 data | - | GPIO48 |
 | On-board VBUS divider (100k/100k) | ADC1 | GPIO3 |
 | On-board TP4054 Li-ion charger | - | - |
 | Li-ion cell (optional) | Battery input | - |
@@ -119,8 +145,10 @@ breakout modules already carry their own I2C pull-up resistors.
 ## Software
 
 - ESP-IDF 5.5, C++14, VS Code
-- [chill-sam/ssd1306](https://components.espressif.com/components/chill-sam/ssd1306)
-  OLED driver, pulled in automatically by the IDF Component Manager
+- [elutsk/esp-ssd1306](https://github.com/elutsk/esp-ssd1306), a fork of
+  [chill-sam/ssd1306](https://components.espressif.com/components/chill-sam/ssd1306)
+  OLED driver with sleep/wake support and a fix for failed initialization
+  (both offered upstream), pulled in from git by the IDF Component Manager
 - [espressif/led_strip](https://components.espressif.com/components/espressif/led_strip)
   WS2812 driver (RMT), pulled in automatically by the IDF Component Manager
 - [Bosch BME68x SensorAPI](https://github.com/boschsensortec/BME68x_SensorAPI),
@@ -143,15 +171,16 @@ components/bme68x/    Bosch BME68x SensorAPI (third-party, unmodified)
 
 | Class / function | Role |
 |---|---|
-| `App` | Main loop step: handles the buttons and the memory, reads the sensor of the current screen, renders it, checks the battery |
+| `App` | Main loop step: handles the buttons and the memory, reads the sensor of the current screen, renders it, checks the battery and the automatic sleep conditions, requests sleep |
 | `evaluatePower()` | Pure function: power source, corrected voltage and battery level from the measured VBUS |
 | `I2cBus` | Owns the I2C master bus (RAII) |
-| `Veml6040` | VEML6040 driver, written from the datasheet |
+| `Veml6040` | VEML6040 driver, written from the datasheet, with shutdown for sleep |
 | `Bme688` | Adapter from `IClimateSensor` to the Bosch BME68x SensorAPI (forced mode, gas heater off) |
-| `Ssd1306Display` | Adapter from `IDisplay` to the chill-sam/ssd1306 library, waits for the panel warm-up after power-up |
+| `Ssd1306Display` | Adapter from `IDisplay` to the ssd1306 library, waits for the panel warm-up after power-up, sleep mode |
 | `Ws2812Led` | Adapter from `IRgbLed` to the led_strip component, timed pulses with a one-shot esp_timer |
 | `AdcVoltage` | ADC one-shot reading behind a resistive divider, eFuse calibration, averaging |
 | `GpioButton` | Button with timer-based debounce (10 ms sampling, 30 ms stable) and short/long click detection |
+| `DeepSleep` | Deep sleep with wake-up by button 1 (ext0), wake-up confirmation by a long press |
 
 ### Project structure
 
@@ -169,9 +198,9 @@ RGBmeter/
       App.cpp, Power.cpp
     drivers/
       include/   I2cBus.h, Veml6040.h, Bme688.h, Ssd1306Display.h, GpioButton.h,
-                 Ws2812Led.h, AdcVoltage.h
+                 Ws2812Led.h, AdcVoltage.h, DeepSleep.h
       I2cBus.cpp, Veml6040.cpp, Bme688.cpp, Ssd1306Display.cpp, GpioButton.cpp,
-      Ws2812Led.cpp, AdcVoltage.cpp
+      Ws2812Led.cpp, AdcVoltage.cpp, DeepSleep.cpp
       idf_component.yml
     bme68x/
       bme68x.c, bme68x.h, bme68x_defs.h, LICENSE
@@ -189,7 +218,8 @@ idf.py -p <PORT> flash monitor
 ```
 
 `<PORT>` is the serial port of the board, for example `COM23` on Windows or
-`/dev/ttyACM0` on Linux.
+`/dev/ttyACM0` on Linux. A sleeping board does not show up on USB: wake it up
+first, or hold BOOT and press RST.
 
 ## Configuration
 
@@ -202,12 +232,13 @@ idf.py -p <PORT> flash monitor
 | OLED warm-up after power-up | `components/drivers/Ssd1306Display.cpp` | 500 ms |
 | Long click time | `components/drivers/GpioButton.cpp` | 1000 ms |
 | USB threshold, voltage corrections, battery range | `components/core/Power.cpp` | 4.4 V; +130 mV USB, +440 mV battery; 3.4-4.2 V |
-| Low battery alert | `components/core/App.cpp` | below 20 %, 100 ms red flash every 10 s |
+| Battery flash | `components/core/App.cpp` | 100 ms every 10 s on battery: red below 20 %, green otherwise |
+| Automatic sleep | `components/core/App.cpp` | on battery: 10 min without button presses; below 0 % in 3 checks in a row |
+| Wake-up hold time | `main/main.cpp` | 750 ms after boot (about 1 s from the press) |
 
 ## Roadmap
 
 - Automatic sensitivity: choose the VEML6040 integration time from the light level
-- Power saving on a long click of button 1 (display off, sleep)
 - Settings, entered with button 1 on the Status screen
 - Automatic exit from the Status screen after a timeout
 - Support for other temperature and humidity sensors (for example BME280)
