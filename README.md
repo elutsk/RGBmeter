@@ -7,12 +7,16 @@ Optional temperature, humidity and air pressure monitoring uses a Bosch BME68x
 sensor.
 
 <p align="center">
-  <img src="media/screens.jpg" width="100%" alt="Prototype screens">
+  <img src="media/screens1a.jpg" width="100%" alt="Prototype screens">
 </p>
 
 - Handwritten in C++14 on top of ESP-IDF 5.5. 
 - VS Code was used for hacking. 
 - Kindly reviewed, commented and partially documented by Claude Opus.
+
+<p align="center">
+  <img src="media/screens1b.jpg" width="100%" alt="Prototype screens">
+</p>
 
 ## Features
 
