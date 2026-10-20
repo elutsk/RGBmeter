@@ -11,7 +11,8 @@ sensor.
 </p>
 
 - Handwritten in C++14 on top of ESP-IDF 5.5. 
-- VS Code was used for hacking. 
+- VS Code was used for hacking. No copiloting)
+- Claude Opus was used for code review, detailed commenting and documentation assistance.
 
 <p align="center">
   <img src="media/screens1b.jpg" width="100%" alt="Prototype screens">
@@ -128,6 +129,7 @@ Mini board:
 - On USB the device is powered from VBUS anyway, so the power switch has no
   effect there: the device goes to deep sleep instead, and flashing works
   without pressing any button.
+- KiCad project could be found in [repository circuit folder](circuit/).
 
 ### Deep sleep
 
