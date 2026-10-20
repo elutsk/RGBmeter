@@ -7,8 +7,11 @@
 #include "Ws2812Led.h"
 #include "AdcVoltage.h"
 #include "DeepSleep.h"
+#include "Power.h"
+#include "PowerSwitch.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -27,6 +30,8 @@ constexpr gpio_num_t kVbusPin = GPIO_NUM_3;           // VBUS through the on-boa
 constexpr int kVbusDividerRatio = 2;                  // (100k + 100k) / 100k
 constexpr bool kBusDiagMode = false;                // i2c + vbus diagnostics mode
 constexpr uint32_t kWakeHoldMs = 750;                 // plus about 250 ms of boot: about 1 s, like a long click
+constexpr gpio_num_t kPowerOffPin = GPIO_NUM_9;       // CS of the battery protection IC (DW01A) through 4.7k
+constexpr uint32_t kCutTimeoutMs = 200;               // the DW01A cuts after 10..20 ms
 
 // Diagnostics: logs every 7-bit address that answers with ACK.
 void scanBus(const I2cBus& bus) {
@@ -46,14 +51,41 @@ void scanBus(const I2cBus& bus) {
     ESP_LOGI(TAG, "scan: %d device(s) found", found);
 }
 
+// True if powered from USB; false on battery or if VBUS cannot be read.
+bool isOnUsb(IVoltageSensor& vbus) {
+    int millivolts = 0;
+    return vbus.readMillivolts(millivolts) && evaluatePower(millivolts).onUsb;
+}
+
+StartCause startCause() {
+    if (DeepSleep::wokeByButton()) return StartCause::ButtonWake;
+    const esp_reset_reason_t reason = esp_reset_reason();
+    if (reason == ESP_RST_POWERON || reason == ESP_RST_BROWNOUT) return StartCause::PowerOn;
+    return StartCause::Other;
+}
+
+// Switches the device off. On battery the protection IC cuts the power: zero
+// current. On USB the battery is not used anyway, so the device goes to deep sleep.
+[[noreturn]] void powerDown(PowerSwitch& powerSwitch, IVoltageSensor& vbus) {
+    DeepSleep::waitForRelease(kModeButtonPin);  // while held, the button keeps the protection IC on
+    if (!isOnUsb(vbus)) powerSwitch.cut(kCutTimeoutMs);  // returns only if the power stayed on
+    DeepSleep::enter(kModeButtonPin);
+}
+
 }  // namespace
 
 // Composition root: creates the concrete hardware objects,
 // wires them into App through interfaces, and runs the main loop.
 extern "C" void app_main(void) {
-    // Woken up from deep sleep by button 1: only a long press really wakes the device,
-    // an accidental short one sends it straight back to sleep. Done before anything else.
-    if (DeepSleep::wokeByButton() && !DeepSleep::confirmWake(kModeButtonPin, kWakeHoldMs)) DeepSleep::enter(kModeButtonPin);
+    PowerSwitch powerSwitch(kPowerOffPin);  // first: drives CS low, the battery stays connected
+
+    // The power source decides how this start is treated, so VBUS is read first.
+    AdcVoltage vbus(kVbusPin, kVbusDividerRatio);
+    const bool vbusReady = vbus.init();
+
+    // Started by button 1: only a long press really switches the device on, an accidental
+    // short one switches it off again. Done before anything else uses the button pin.
+    if (decideStart(startCause(), isOnUsb(vbus)) == StartAction::ConfirmButton && !DeepSleep::confirmWake(kModeButtonPin, kWakeHoldMs)) powerDown(powerSwitch, vbus);
 
     Ws2812Led led(kLedPin);
     I2cBus bus(kSdaPin, kSclPin);
@@ -62,7 +94,6 @@ extern "C" void app_main(void) {
     Bme688 bme(bus);
     GpioButton modeButton(kModeButtonPin);
     GpioButton memoryButton(kMemoryButtonPin);
-    AdcVoltage vbus(kVbusPin, kVbusDividerRatio);
 
     // Startup failure: report it, show red and stop here. No return: leaving
     // app_main would destroy all objects above, including the LED driver.
@@ -78,7 +109,7 @@ extern "C" void app_main(void) {
         led.ledTest(kLedLevel, 200);        // quick test sequence
     }
 
-    if (!vbus.init()) fail("VBUS ADC");
+    if (!vbusReady) fail("VBUS ADC");
     if (kBusDiagMode) {
         // VBUS first: the supply voltage is the first suspect when something fails.
         int startupMillivolts = 0;
@@ -102,7 +133,7 @@ extern "C" void app_main(void) {
             led.sleep();
             oled.sleep();
             veml.shutdown();
-            DeepSleep::enter(kModeButtonPin);  // never returns: waking up is a reboot
+            powerDown(powerSwitch, vbus);  // never returns: switching on again is a reboot
         }
 
         vTaskDelay(pdMS_TO_TICKS(kTickPeriodMs));

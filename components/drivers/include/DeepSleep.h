@@ -12,11 +12,15 @@ namespace DeepSleep {
 // True if this boot is a wake-up from deep sleep caused by the button.
 bool wokeByButton();
 
-// Call right after wokeByButton() returned true, before anything else uses the pin.
+// Call at startup, before anything else uses the pin: after a wake-up from deep
+// sleep, or after a power-on by the button through the battery protection IC.
 // Returns true if the button stays pressed for holdMs; it then also waits for the
 // release, so the same press is not seen as a click later. Returns false if the
 // button was released earlier (an accidental press).
 bool confirmWake(gpio_num_t pin, uint32_t holdMs);
+
+// Waits until the button (active low) reads released, with debounce.
+void waitForRelease(gpio_num_t pin);
 
 // Waits for the button release, arms the ext0 wake-up on it and enters deep sleep.
 // Never returns: the next wake-up is a reboot.

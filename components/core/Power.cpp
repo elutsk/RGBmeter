@@ -35,3 +35,15 @@ PowerStatus evaluatePower(int vbusMillivolts) {
     }
     return status;
 }
+
+StartAction decideStart(StartCause cause, bool onUsb) {
+    switch (cause) {
+    case StartCause::ButtonWake:
+        return StartAction::ConfirmButton;
+    case StartCause::PowerOn:
+        return onUsb ? StartAction::Start : StartAction::ConfirmButton;
+    case StartCause::Other:
+        return StartAction::Start;
+    }
+    return StartAction::Start;  // not reached: the switch covers all values
+}

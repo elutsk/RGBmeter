@@ -17,8 +17,10 @@ bool isPressed(gpio_num_t pin) {
     return gpio_get_level(pin) == 0;  // active low
 }
 
-// Waits until the button reads released for kStableSamples polls in a row.
-void waitForRelease(gpio_num_t pin) {
+}  // namespace
+
+void DeepSleep::waitForRelease(gpio_num_t pin) {
+    // Released for kStableSamples polls in a row.
     int released = 0;
     while (released < kStableSamples) {
         released = isPressed(pin) ? 0 : released + 1;
@@ -26,14 +28,13 @@ void waitForRelease(gpio_num_t pin) {
     }
 }
 
-}  // namespace
-
 bool DeepSleep::wokeByButton() {
     return esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0;
 }
 
 bool DeepSleep::confirmWake(gpio_num_t pin, uint32_t holdMs) {
     // After deep sleep the wake-up pad is still an RTC IO: make it a normal input again.
+    // After a power-on it is not an RTC IO, and the call changes nothing.
     ESP_ERROR_CHECK(rtc_gpio_deinit(pin));
     gpio_config_t io = {};
     io.pin_bit_mask = 1ULL << pin;
